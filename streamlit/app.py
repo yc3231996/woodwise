@@ -4,7 +4,7 @@ import re
 import base64
 import av
 from io import BytesIO
-from vertex_helper import analyze_video, create_imitation
+from vertex_helper import analyze_video, create_imitation, translate_script
 from vertexai.generative_models import Part
 
 # 添加密码保护
@@ -41,6 +41,9 @@ def main():
     # 如果密码不正确，不显示应用内容
     if not check_password():
         st.stop()
+
+    # 添加侧边栏
+    st.sidebar.markdown("## 产品选择")
 
     st.title("视频解读和创作")
     # 视频输入选项卡
@@ -159,7 +162,8 @@ def start_creation(country, target_audience, product_points, skin_type, ba_abili
 def start_translate(script, target_language):
     # 模拟翻译过程
     with st.spinner('正在翻译...'):
-        translated_script = translate_script_mock(script, target_language)
+        # translated_script = translate_script_mock(script, target_language)
+        translated_script = translate_script(script, target_language)
         st.session_state['translated_script'] = translated_script
     st.success('翻译完成！')
     return translated_script

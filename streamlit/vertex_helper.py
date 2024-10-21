@@ -118,7 +118,7 @@ def create_imitation(sample_script, input_data):
     with open(outline_km_path, 'r', encoding='gbk') as f:
       outline_km = f.read()
 
-  prompt_outline= f"""
+  prompt_outline = f"""
   作为一个专业的短视频编导和内容营销专家，根据提供的短视频参考脚本，并根据自己的短视频脚本创作框架进行创作，用{input_data['target_language']}作为语言，仿写一个类似的脚本。
   注意follow如下的创作过程：
   1. 分析参考脚本和自己的创作框架,模仿参考脚本的结构和高光画面，包括字幕，输出详细的分镜，同时详细阐述创作理由，对每一个分镜需要详细说明其目的，意义及必要性。
@@ -189,6 +189,19 @@ def create_imitation(sample_script, input_data):
   model = GenerativeModel("gemini-1.5-pro")
   outline_response = model.generate_content([prompt_outline], generation_config=generation_config, safety_settings=safety_settings)
   return outline_response.text
+
+
+def translate_script(script, target_language):
+  prompt_translate = f"""
+  把下面文本翻译成目标语言包 {target_language}, 要求符合目标语言国家的口语习惯，符合tiktok短视频的表达方式。并保持输出格式和原文完全一致。
+
+  文本：
+  {script}
+  """
+
+  model = GenerativeModel("gemini-1.5-pro")
+  response = model.generate_content([prompt_translate], generation_config=generation_config, safety_settings=safety_settings,)
+  return response.text
 
 
 if __name__ == "__main__":
