@@ -38,9 +38,9 @@ def check_password():
 def main():
     st.set_page_config(page_title="视频解读和创作", layout="wide")
 
-    # # 如果密码不正确，不显示应用内容
-    # if not check_password():
-    #     st.stop()
+    # 如果密码不正确，不显示应用内容
+    if not check_password():
+        st.stop()
 
     st.title("视频解读和创作")
     # 视频输入选项卡
