@@ -4,7 +4,7 @@ import re
 import base64
 import av
 from io import BytesIO
-from vertex_helper import analyze_video, create_imitation, translate_script
+from vertex_helper import analyze_video, create_imitation, translate_script, read_from_resource
 from vertexai.generative_models import Part
 
 # 添加密码保护
@@ -316,23 +316,17 @@ def analyze_video_mock(source, is_url):
     file_contents, mime_type = source
     display_video_frame(file_contents,  50)
 
-    return f"""
+    script_analysis_sample = read_from_resource('prompt/script-analysis-sample.md')
+     
+    mock_analysis = f"""
     这是一个示例视频解读结果（{source_type}）。
-
-    - 视频时长：10分钟
-    - 主要内容：介绍人工智能的基础概念
-    - 关键时间点：
-        1. 0:30 - AI的定义
-        2. 2:15 - 机器学习简介
-        3. 5:00 - 深度学习解释
-
     使用markdown语法显示图片
     ![frame](data:image/png;base64,{get_video_frame_base64(file_contents, 10)})
 
     使用html显示图片
     <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 50%; max-width: 300px;" alt="第10秒的帧">
-
     """
+    return script_analysis_sample
 
 # mock method
 def create_imitation_mock(analysis, input_data):
