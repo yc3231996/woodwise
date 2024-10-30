@@ -3,6 +3,7 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, Part, SafetySetting
 import os
 import base64
+from http_helper import call_workflow_api
 
 # 全局配置
 generation_config = {
@@ -108,6 +109,15 @@ def analyze_video(source, is_url):
 
 
 def create_imitation(sample_script, input_data):
+  input_obj = {
+    "script_sample": str(sample_script),
+    "product_info": str(input_data)
+  }
+  result = call_workflow_api(input_obj)
+  return result['script_imitated']
+
+
+def create_imitation_old(sample_script, input_data):
   outline_km = read_from_resource('prompt/短视频脚本创作框架 V3 (专注于祛痘护肤产品-LLM版).md')
   content_km = read_from_resource('prompt/km-祛痘.md')
 
