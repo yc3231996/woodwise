@@ -142,8 +142,8 @@ def process_video(source, is_url):
         if is_url:
             video_analysis = analyze_video(source, is_url)
         else:
-            video_analysis = analyze_video_mock(source, is_url)
-            # video_analysis = analyze_video(source, is_url)
+            # video_analysis = analyze_video_mock(source, is_url)
+            video_analysis = analyze_video(source, is_url)
         st.session_state['video_analysis'] = video_analysis
         st.session_state['video_source'] = source
     st.success('解读完成！')
