@@ -121,8 +121,10 @@ def create_imitation_old(sample_script, input_data):
   outline_km = read_from_resource('prompt/短视频脚本创作框架 V3 (专注于祛痘护肤产品-LLM版).md')
   content_km = read_from_resource('prompt/km-祛痘.md')
 
+  target_lan = input_data['target_language']
+
   prompt_outline = f"""
-  作为一个专业的短视频编导和内容营销专家，根据提供的短视频参考脚本，{input_data['target_language']}作为输出语言，模仿创作一个类似的脚本。
+  作为一个专业的短视频编导和内容营销专家，根据提供的短视频参考脚本，{target_lan}作为输出语言，模仿创作一个类似的脚本。
   注意follow如下的创作过程：
   1. 模仿<短视频参考脚本>中提供的参考脚本，包括分镜结构，高光画面等，根据<产品信息>提供的信息, 模仿创作一个短视频脚本，并输出详细的分镜。
   2. 可以利用<短视频脚本创作框架>提供的创作框架，作为创作指导，但尽量完全模仿参考脚本。创作框架仅仅是作为指导，尽量被模仿的对象。

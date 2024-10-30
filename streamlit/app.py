@@ -6,6 +6,7 @@ import av
 from io import BytesIO
 from vertex_helper import analyze_video, create_imitation, translate_script, read_from_resource
 from vertexai.generative_models import Part
+import json
 
 # 添加密码保护
 def check_password():
@@ -44,7 +45,7 @@ def main():
 
     # 添加侧边栏
     st.sidebar.markdown("## 产品知识库")
-    st.sidebar.selectbox("选择产品线", ["祛痘产品线"])
+    st.session_state['selected_product'] = st.sidebar.selectbox("选择产品线", ["祛痘", "泥膜", "洗面奶", "隔离", "双管洁面"], disabled=True)
 
     st.title("视频解读和创作")
     # 视频输入选项卡
@@ -71,70 +72,87 @@ def main():
         st.markdown("## 视频解读结果")
         st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
 
-        # 显示模仿创作表单
-        st.header("模仿创作")
-        with st.form("imitation_form"):
-            st.subheader("市场描述")
-            country = st.text_input("国家 *", help="必填项")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                product_points = st.text_area("产品卖点", help="可选项")
-            with col2:
-                target_audience = st.text_area("目标人群描述", help="可选项")
-            
-            st.subheader("达人描述")
-            col3, col4 = st.columns(2)
-            with col3:
-                skin_type = st.selectbox("皮肤类别", ["历史严重但现在改善", "油性肤质", "干性肤质"])
-                ba_ability = st.selectbox("BA能力", ["Before爆款", "无Before爆款", "其他"])
-                ba_ability_custom = st.text_input("自定义BA能力", help="如果上面选择'其他'，请在此输入自定义BA能力")
-            with col4:
-                voice_over_skill = st.selectbox("口播能力", ["强口播", "故事描述型"])
-                image = st.selectbox("形象", ["美女", "帅哥", "其他"])
-                image_custom = st.text_input("自定义形象", help="如果上面选择'其他'，请在此输入自定义形象描述")
-
-            st.subheader("输出格式")
-            target_language = st.selectbox("目标语言", ["中文", "英文", "印尼语", "泰语", "马来语", "越南语"])
-
-            submitted = st.form_submit_button("开始创作")
+        # 显示模仿模块
+        st.header("1:1模仿")
+        st.subheader("市场描述")
+        country = st.text_input("国家 *", help="必填项")
         
-        # 创作脚本显示在表单外部
-        if submitted:
-            if not country:
-                st.error("请填写国家信息")
+        col1, col2 = st.columns(2)
+        with col1:
+            product_desc = st.text_area("产品描述 *", help="必填项")
+        with col2:
+            target_audience = st.text_area("目标人群描述", help="可选项")
+        
+        st.subheader("达人描述")
+        col3, col4 = st.columns(2)
+        with col3:
+            skin_type = st.text_input("皮肤情况", placeholder="历史问题严重/光亮皮肤/等", help="描述达人的皮肤情况，可以用任意文字描述")
+            image = st.text_input("自定义形象", placeholder="帅哥/美女", help="描述达人的形象特点，可以用任意文字描述")
+        with col4:
+            voiceover_skill = st.text_input("口播能力", placeholder="口播强/口播弱", help="描述达人的口播能力，可以用任意文字描述")
+            ba_ability = st.selectbox("BA能力", ["Before爆款", "无Before爆款", "其他"])
+
+        st.subheader("输出格式")
+        target_language = st.selectbox("目标语言", ["中文", "英文", "印尼语", "泰语", "马来语", "越南语"])
+        
+        # 模仿动作
+        if st.button("开始1:1模仿"):
+            if not country or not product_desc:
+                st.error("请填写国家信息和产品描述")
             else:
-                # 处理BA能力和形象的选择
-                final_ba_ability = ba_ability_custom if ba_ability == "其他" else ba_ability
-                final_image = image_custom if image == "其他" else image
-                start_creation(country, target_audience, product_points, skin_type, final_ba_ability, voice_over_skill, final_image, target_language)
+                input_data = {
+                    "country": country,
+                    "target_audience": target_audience,
+                    "product_desc": product_desc,
+                    "skin_type": skin_type,
+                    "voiceover_skill": voiceover_skill,
+                    "image": image,
+                    "target_language": target_language
+                }
+                input_data_json = json.dumps(input_data)
+                start_imitation(input_data_json)
 
-    # 显示创作结果
-    if 'creation_script' in st.session_state:
-        st.markdown("## 模仿创作脚本")
-        # 显示参考图片
-        if 'video_source' in st.session_state:
-            video_source = st.session_state['video_source']
-            if isinstance(video_source, str):  # URL
-                # URl模式中不支持显示参考图片
-                st.markdown(st.session_state['creation_script'], unsafe_allow_html=True)
-            else:  # Uploaded file
-                file_contents, _ = video_source
-                enhanced_script = enhance_script_with_img2(st.session_state['creation_script'], file_contents)
-                st.markdown(enhanced_script, unsafe_allow_html=True)
-        else:
-            st.warning("视频源找不到")
+    # 显示模仿结果
+    if 'imitated_script' in st.session_state:
+        st.markdown("## 模仿复刻的脚本")
 
-        # 显示翻译功能
-        st.header("翻译")
-        target_lang = st.text_input("目标语言", value="英语")
-        if st.button("翻译"):
-            translated_script = start_translate(st.session_state['creation_script'], target_lang)
+        # 由于要生成参考图片，会比较废时间
+        with st.spinner('正在生成参考图片...'):
+            if 'video_source' in st.session_state:
+                video_source = st.session_state['video_source']
+                if isinstance(video_source, str):  # URL
+                    # URl模式中不支持显示参考图片
+                    st.markdown(st.session_state['imitated_script'], unsafe_allow_html=True)
+                else:  # Uploaded file
+                    file_contents, _ = video_source
+                    enhanced_script = enhance_script_with_img(st.session_state['imitated_script'], file_contents)
+                    st.markdown(enhanced_script, unsafe_allow_html=True)
+            else:
+                st.warning("视频源找不到")
 
-    # 显示翻译结果
-    if 'translated_script' in st.session_state:
-        st.markdown("### 翻译结果")
-        st.markdown(st.session_state['translated_script'], unsafe_allow_html=True)
+        # # 显示翻译功能
+        # st.header("翻译")
+        # target_lang = st.text_input("目标语言", value="英语")
+        # if st.button("翻译模仿脚本"):
+        #     translated_script = start_translate(st.session_state['imitated_script'], target_lang)
+
+    #     # 显示创作模块
+    #     st.header("创作脚本")
+    #     inspiration = st.text_area("创作灵感", placeholder="请输入你的创作灵感或者要求", help="可选项")
+    #     if st.button("创作新脚本"):
+    #         # start_creation(st.session_state['imitated_script'], inspiration)
+    #         st.warning("测试中。")
+
+    # # 在模仿之后，先避免其他动作，每一次重新提交会导致为imitated script重新生成参考图片，这个过程非常消耗资源
+    # # 显示创作结果
+    # if 'created_script' in st.session_state:
+    #     st.markdown("### 创作结果")
+    #     st.markdown(st.session_state['created_script'], unsafe_allow_html=True)
+
+    # # 显示翻译结果
+    # if 'translated_script' in st.session_state:
+    #     st.markdown("### 翻译结果")
+    #     st.markdown(st.session_state['translated_script'], unsafe_allow_html=True)
 
 
 def process_video(source, is_url):
@@ -149,24 +167,18 @@ def process_video(source, is_url):
     st.success('解读完成！')
 
 
-def start_creation(country, target_audience, product_points, skin_type, ba_ability, voice_over_skill, image, target_language):
-    input_data = {
-        "country": country,
-        "target_audience": target_audience,
-        "product": product_points,
-        "influencer_traits": {
-            "skin_type": skin_type,
-            "ba_ability": ba_ability,
-            "voice_over_skill": voice_over_skill,
-            "image": image
-        },
-        "target_language": target_language
-    }
-    
+def start_imitation(input_data : str):
+    with st.spinner('正在模仿中...'):
+        # imitated_script = create_imitation_mock(st.session_state['video_analysis'], input_data)
+        imitated_script = create_imitation(st.session_state['video_analysis'], input_data)
+        st.session_state['imitated_script'] = imitated_script
+    st.success('模仿完成！')
+
+
+def start_creation(inspiration : str):
     with st.spinner('正在创作中...'):
-        # creation_script = create_imitation_mock(st.session_state['video_analysis'], input_data)
-        creation_script = create_imitation(st.session_state['video_analysis'], input_data)
-        st.session_state['creation_script'] = creation_script
+        created_script = create_script_mock(st.session_state['imitated_script'], inspiration)
+        st.session_state['created_script'] = created_script
     st.success('创作完成！')
 
 
@@ -246,8 +258,8 @@ def display_video_frame_base64(video_bytes, second):
         st.error('无法提取指定时间的帧 (base64 方法)')
 
 
-# 处理脚本中出现的参考画面
-def enhance_script_with_img(script):
+# 获取脚本中出现的参考画面
+def get_img_clip(script):
     # 使用两个不同的模式来匹配两种格式
     pattern1 = r'<参考画面>(\d+)-(\d+)</参考画面>'
     pattern2 = r'<参考画面>(\d{2}:\d{2})-(\d{2}:\d{2})</参考画面>'
@@ -278,7 +290,7 @@ def convert_to_seconds(time_str):
     return minutes * 60 + seconds
 
 
-def enhance_script_with_img2(script, video_bytes):
+def enhance_script_with_img(script, video_bytes):
     # 使用两个不同的模式来匹配两种格式
     pattern1 = r'<参考画面>(\d+)-(\d+)</参考画面>'
     pattern2 = r'<参考画面>(\d{2}:\d{2})-(\d{2}:\d{2})</参考画面>'
@@ -296,7 +308,7 @@ def enhance_script_with_img2(script, video_bytes):
         frame_base64 = get_video_frame_base64(video_bytes, mid_time)
         
         if frame_base64:
-            return f'<img src="data:image/png;base64,{frame_base64}" style="width: 100px;" alt="第{mid_time}秒的帧">'
+            return f'<img src="data:image/png;base64,{frame_base64}" style="width: 200px;" alt="第{mid_time}秒的帧">'
         else:
             return match.group(0)  # 如果无法获取图片,保留原始标记
     
@@ -314,7 +326,7 @@ def analyze_video_mock(source, is_url):
     source_type = "URL" if is_url else "上传文件"
 
     file_contents, mime_type = source
-    display_video_frame(file_contents,  50)
+    display_video_frame(file_contents,  20)
 
     script_analysis_sample = read_from_resource('prompt/script-analysis-sample.md')
      
@@ -330,8 +342,8 @@ def analyze_video_mock(source, is_url):
 
 # mock method
 def create_imitation_mock(analysis, input_data):
-    # 模拟创作过程
-    time.sleep(3)  # 模拟耗时操作
+    # 模拟模仿过程
+    time.sleep(2)  # 模拟耗时操作
 
     outline_km_path = 'prompt/短视频脚本创作框架 V3 (专注于祛痘护肤产品-LLM版).md'
     try:
@@ -340,23 +352,15 @@ def create_imitation_mock(analysis, input_data):
     except UnicodeDecodeError:
         # 如果 UTF-8 失败，尝试其他编码
         with open(outline_km_path, 'r', encoding='gbk') as f:
-                outline_km = f.read()
+            outline_km = f.read()
 
     file_contents, mime_type = st.session_state['video_source']
 
     return f"""
     基于原视频的结构和您提供的信息，以下是一个模仿创作的脚本大纲：
 
-    国家：{input_data['country']}
-    目标受众：{input_data['target_audience']}
-    产品卖点：{input_data['product']}
-    目标语言：{input_data['target_language']}
+    input_data{input_data}
 
-    达人描述：
-    - 皮肤类别：{input_data['influencer_traits']['skin_type']}
-    - BA能力：{input_data['influencer_traits']['ba_ability']}
-    - 口播能力：{input_data['influencer_traits']['voice_over_skill']}
-    - 形象：{input_data['influencer_traits']['image']}
 
 ## 分镜脚本
 
@@ -366,15 +370,17 @@ def create_imitation_mock(analysis, input_data):
 | 2 | 黑白色调, 中景拍摄达人运倩画面, 神情失落 | 2秒 | 无法自信地面对他人 | 展现居印问题对生活的负面影响, 引发情感共鸣 | 问题呈现: 深化痛点, 为产品解决方案做铺垫 | <参考画面>1-3</参考画面> |
 | 3 | 彩色画面, 产品包装盒特写, 突出产品名称 | 2秒 | XXX好居产品, 你的居印放心! | 产品包装画面走大方, 使用动画文字突出产品名 | 产品介绍: 引入解决方案, 激发观众兴趣 | <参考画面>00:10-00:12</参考画面> |
 | 4 | 左侧为达人使用产品前的照片, 右侧为达人使用产品后的照片 | 3秒 | 使用前 VS 使用后效果看得见! | 使用前后效果对比, 突出使用产品前后居印的改变 | 效果展示: 直观展示产品效果, 增强说服�� | <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 100px;" alt="第10秒的帧"> |
-| 5 | 近景特写, 达人手持产品, 演示使用方法 | 2秒 | 使用方法简单, 快速吸收! | 画面清晰流畅, 突出产品使用方法易吸收 | 使用演示: 降低使用门槛, 增强产品吸引力 | <参考画面>00:55-00:57</参考画面> |
-| 6 | 彩色画面, 近景拍摄达人面部, 肤色均匀亮泽 | 2秒 | 居印改化, 肌肤重现光彩 | 达人面部特写, 展现使用产品后健康自信的肌肤状态 | 效果展示: 强化产品价值, 刺激购买欲望 |  |
-| 7 | 彩色画面, 全景拍摄达人自信地走在街上 | 2秒 | 找回自信, 拥抱更美好的生活! | 画面明亮充满活力, 展现达人积极向上的生活状态 | 情感升华: 将产品与自信美好生活紧密联系 |  |
-
-核心结构: 居印问题B+产品适度特写+BA对比+近景使用+全景BA人生活方式GA+CTA
 
 <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 50%; max-width: 300px;" alt="第10秒的帧">
 
     """
+
+
+# create script mock
+def create_script_mock(imitated_script, inspiration):
+    # 模拟创作过程
+    time.sleep(2)  # 模拟耗时操作
+    return "created script"
 
 
 # mock method 
