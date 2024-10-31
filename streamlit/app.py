@@ -43,9 +43,9 @@ def main():
     if not check_password():
         st.stop()
 
-    # 添加侧边栏
-    st.sidebar.markdown("## 产品知识库")
-    st.session_state['selected_product'] = st.sidebar.selectbox("选择产品线", ["祛痘", "泥膜", "洗面奶", "隔离", "双管洁面"], disabled=True)
+    # # 添加侧边栏
+    # st.sidebar.markdown("## 产品知识库")
+    # st.session_state['selected_product'] = st.sidebar.selectbox("选择产品线", ["祛痘", "泥膜", "洗面奶", "隔离", "双管洁面"], disabled=True)
 
     st.title("视频解读和创作")
     # 视频输入选项卡
@@ -328,7 +328,7 @@ def analyze_video_mock(source, is_url):
     file_contents, mime_type = source
     display_video_frame(file_contents,  20)
 
-    script_analysis_sample = read_from_resource('prompt/script-analysis-sample.md')
+    script_analysis_sample = read_from_resource('prompt/script-analysis-mock.md')
      
     mock_analysis = f"""
     这是一个示例视频解读结果（{source_type}）。
