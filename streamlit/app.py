@@ -192,22 +192,6 @@ def start_translate(script, target_language):
     return translated_script
 
 
-def display_video_player(source):
-    if isinstance(source, str):  # URL
-        video_id = extract_video_id(source)
-        if video_id:
-            st.video(f"https://www.youtube.com/watch?v={video_id}")
-        else:
-            st.video(source)
-    else:  # Uploaded file
-        st.video(source)
-
-def extract_video_id(url):
-    youtube_regex = r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
-    match = re.match(youtube_regex, url)
-    return match.group(6) if match else None
-
-
 # 返回第time_sec秒的画面image对象
 def get_video_frame(video_bytes, time_sec):
     with av.open(BytesIO(video_bytes)) as container:
