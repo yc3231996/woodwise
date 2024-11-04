@@ -70,47 +70,60 @@ def main():
     # 显示解读结果
     if 'video_analysis' in st.session_state:
         st.markdown("## 视频解读结果")
-        st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
-
-        # 显示模仿模块
-        st.header("1:1模仿")
-        st.subheader("市场描述")
-        country = st.text_input("国家 *", help="必填项")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            product_desc = st.text_area("产品描述 *", help="必填项")
-        with col2:
-            target_audience = st.text_area("目标人群描述", help="可选项")
-        
-        st.subheader("达人描述")
-        col3, col4 = st.columns(2)
-        with col3:
-            skin_type = st.text_input("皮肤情况", placeholder="历史问题严重/光亮皮肤/等", help="描述达人的皮肤情况，可以用任意文字描述")
-            image = st.text_input("自定义形象", placeholder="帅哥/美女", help="描述达人的形象特点，可以用任意文字描述")
-        with col4:
-            voiceover_skill = st.text_input("口播能力", placeholder="口播强/口播弱", help="描述达人的口播能力，可以用任意文字描述")
-            ba_ability = st.selectbox("BA能力", ["Before爆款", "无Before爆款", "其他"])
-
-        st.subheader("输出格式")
-        target_language = st.selectbox("目标语言", ["中文", "英文", "印尼语", "泰语", "马来语", "越南语"])
-        
-        # 模仿动作
-        if st.button("开始1:1模仿"):
-            if not country or not product_desc:
-                st.error("请填写国家信息和产品描述")
+        # 生成参考图片，会比较废时间
+        with st.spinner('正在生成参考图片...'):
+            if 'video_source' in st.session_state:
+                video_source = st.session_state['video_source']
+                if isinstance(video_source, str):  # URL
+                    # URl模式中不支持显示参考图片
+                    st.markdown(st.session_state['imitated_script'], unsafe_allow_html=True)
+                else:  # Uploaded file
+                    file_contents, _ = video_source
+                    enhanced_analysis = enhance_script_with_img(st.session_state['video_analysis'], file_contents)
+                    st.markdown(enhanced_analysis, unsafe_allow_html=True)
             else:
-                input_data = {
-                    "country": country,
-                    "target_audience": target_audience,
-                    "product_desc": product_desc,
-                    "skin_type": skin_type,
-                    "voiceover_skill": voiceover_skill,
-                    "image": image,
-                    "target_language": target_language
-                }
-                input_data_json = json.dumps(input_data)
-                start_imitation(input_data_json)
+                st.warning("视频源找不到")
+
+
+        # # 显示模仿模块, 暂时disable
+        # st.header("1:1模仿")
+        # st.subheader("市场描述")
+        # country = st.text_input("国家 *", help="必填项")
+        
+        # col1, col2 = st.columns(2)
+        # with col1:
+        #     product_desc = st.text_area("产品描述 *", help="必填项")
+        # with col2:
+        #     target_audience = st.text_area("目标人群描述", help="可选项")
+        
+        # st.subheader("达人描述")
+        # col3, col4 = st.columns(2)
+        # with col3:
+        #     skin_type = st.text_input("皮肤情况", placeholder="历史问题严重/光亮皮肤/等", help="描述达人的皮肤情况，可以用任意文字描述")
+        #     image = st.text_input("自定义形象", placeholder="帅哥/美女", help="描述达人的形象特点，可以用任意文字描述")
+        # with col4:
+        #     voiceover_skill = st.text_input("口播能力", placeholder="口播强/口播弱", help="描述达人的口播能力，可以用任意文字描述")
+        #     ba_ability = st.selectbox("BA能力", ["Before爆款", "无Before爆款", "其他"])
+
+        # st.subheader("输出格式")
+        # target_language = st.selectbox("目标语言", ["中文", "英文", "印尼语", "泰语", "马来语", "越南语"])
+        
+        # # 模仿动作
+        # if st.button("开始1:1模仿"):
+        #     if not country or not product_desc:
+        #         st.error("请填写国家信息和产品描述")
+        #     else:
+        #         input_data = {
+        #             "country": country,
+        #             "target_audience": target_audience,
+        #             "product_desc": product_desc,
+        #             "skin_type": skin_type,
+        #             "voiceover_skill": voiceover_skill,
+        #             "image": image,
+        #             "target_language": target_language
+        #         }
+        #         input_data_json = json.dumps(input_data)
+        #         start_imitation(input_data_json)
 
     # 显示模仿结果
     if 'imitated_script' in st.session_state:
@@ -292,7 +305,7 @@ def enhance_script_with_img(script, video_bytes):
         frame_base64 = get_video_frame_base64(video_bytes, mid_time)
         
         if frame_base64:
-            return f'<img src="data:image/png;base64,{frame_base64}" style="width: 200px;" alt="第{mid_time}秒的帧">'
+            return f'<img src="data:image/png;base64,{frame_base64}" style="width: 120px;" alt="第{mid_time}秒的帧">'
         else:
             return match.group(0)  # 如果无法获取图片,保留原始标记
     
