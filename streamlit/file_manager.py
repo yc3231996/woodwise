@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 class FileManager:
-    def __init__(self, base_dir="tmp"):
+    def __init__(self, base_dir="static"):
         self.base_dir = base_dir
         self._ensure_base_dirs()
 
@@ -58,14 +58,8 @@ class FileManager:
         with open(full_path, 'rb') as f:
             return f.read()
 
-    def save_frame(self, frames_dir, frame_number, image_data, is_gif=False):
-        """保存帧图片"""
-        frames_dir = Path(self.base_dir) / frames_dir
-        if is_gif:
-            filename = f"frame_{frame_number[0]:03d}-{frame_number[1]:03d}.gif"
-        else:
-            filename = f"frame_{frame_number:03d}.jpg"
-        
-        frame_path = frames_dir / filename
-        image_data.save(frame_path)
-        return str(Path(frames_dir.name) / filename)
+
+    def get_frame_dir(self, frame_dir):
+        """根据相对帧目录路径返回完整路径"""
+        return Path(self.base_dir) / frame_dir
+

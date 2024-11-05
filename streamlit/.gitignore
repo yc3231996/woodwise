@@ -2,3 +2,4 @@
 /config/gen-lang-client.json
 /.env
 /tmp
+/static/videos

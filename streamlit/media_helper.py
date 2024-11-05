@@ -2,12 +2,15 @@ import av
 from PIL import Image
 from io import BytesIO
 import streamlit as st
-def create_gif_with_av(video_bytes, start_time, end_time, fps=10, target_width=320):
+import os
+
+def create_gif(video_bytes, output_path, start_time, end_time, fps=8, target_width=100):
     """
-    使用 PyAV 创建 GIF
+    使用 PyAV 创建 GIF 并保存到指定路径
     
     参数:
         video_bytes: 视频文件的字节内容
+        output_path: GIF输出路径（包括文件名）
         start_time: 开始时间(秒)
         end_time: 结束时间(秒)
         fps: GIF的帧率
@@ -61,10 +64,12 @@ def create_gif_with_av(video_bytes, start_time, end_time, fps=10, target_width=3
     if not frames:
         raise ValueError("没有帧被捕获")
     
-    # 创建 GIF
-    gif_buffer = BytesIO()
+    # 确保输出目录存在
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # 保存 GIF 到文件
     frames[0].save(
-        gif_buffer,
+        output_path,
         format='GIF',
         save_all=True,
         append_images=frames[1:],
@@ -72,13 +77,15 @@ def create_gif_with_av(video_bytes, start_time, end_time, fps=10, target_width=3
         loop=0,
         optimize=True
     )
-    gif_buffer.seek(0)
     
-    return gif_buffer
+    return output_path
 
 # Streamlit 使用示例
 def main():
     st.title("视频片段GIF预览")
+    
+    # 添加输出目录输入框
+    output_dir = st.text_input("GIF输出目录", value="output")
     
     uploaded_file = st.file_uploader("选择视频文件", type=['mp4', 'mov', 'avi'])
     
@@ -86,16 +93,26 @@ def main():
         video_bytes = uploaded_file.read()
         
         try:
-            gif_buffer = create_gif_with_av(
+            # 构建输出文件路径
+            filename = f"{os.path.splitext(uploaded_file.name)[0]}_1-3s.gif"
+            output_path = os.path.join(output_dir, filename)
+            
+            # 创建GIF
+            gif_path = create_gif(
                 video_bytes,
+                output_path=output_path,
                 start_time=1.0,
                 end_time=3.0,
                 fps=10,
                 target_width=320
             )
             
-            # 显示 GIF
-            st.image(gif_buffer, caption="1-3秒片段预览")
+            # 显示成功信息和GIF预览
+            st.success(f"GIF已保存到: {gif_path}")
+            
+            # 从文件读取并显示GIF预览
+            with open(gif_path, "rb") as f:
+                st.image(f.read(), caption="1-3秒片段预览")
             
         except Exception as e:
             st.error(f"生成GIF时发生错误: {str(e)}")

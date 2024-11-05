@@ -8,6 +8,8 @@ from vertex_helper import analyze_video, create_imitation, translate_script, rea
 from vertexai.generative_models import Part
 import json
 from file_manager import FileManager
+from media_helper import create_gif
+import os
 
 # 添加密码保护
 def check_password():
@@ -69,19 +71,75 @@ def main():
         else:
             st.warning("请提供视频 URL 或上传视频文件")
 
-    # 显示解读结果
+    # 显示解读结果，每次state状态变化，也会触发执行流程，在下面代码中，不能引用button点击代码块中定义的变量，比如file_contents
     if 'video_analysis' in st.session_state:
+        video_analysis = st.session_state['video_analysis']
         st.markdown("## 视频解读结果")
+        st.markdown(video_analysis, unsafe_allow_html=True)
+
         # 生成参考图片，会比较废时间
         with st.spinner('正在生成参考图片...'):
             if 'video_analysis' in st.session_state:
-                if video_url:  # URL
-                    # URl模式中不支持显示参考图片
-                    st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
-                else:  # Uploaded file
-                    video_analysis = st.session_state['video_analysis']
-                    enhanced_analysis = enhance_script_with_img(video_analysis, file_contents)
-                    st.markdown(enhanced_analysis, unsafe_allow_html=True)
+                if video_url:
+                    # TODO
+                    pass
+                else:
+                    # 获取参考时间和对应的gif路径
+                    reference_frames, gifs = create_gif_for_script(video_analysis)
+                    
+                    # 显示每个参考画面的时间区间和对应的gif
+                    if reference_frames and gifs:
+                        st.subheader("参考画面")
+                        
+                        # 添加自定义CSS来覆盖Streamlit默认样式
+                        st.markdown("""
+                            <style>
+                                .flex-container {
+                                    display: flex;
+                                    flex-wrap: wrap;
+                                    gap: 20px;
+                                    justify-content: flex-start;
+                                    width: 100%;
+                                }
+                                .flex-item {
+                                    flex: 0 1 150px;  /* 改为固定宽度，允许缩小但不放大 */
+                                    min-width: 150px; /* 确保最小宽度 */
+                                    text-align: center;
+                                    margin-bottom: 10px;
+                                }
+                                .flex-item p {
+                                    margin: 0 0 5px 0;
+                                    font-size: 0.9em;
+                                }
+                                .flex-item img {
+                                    width: 150px;
+                                    height: auto;
+                                    display: block;
+                                    margin: 0 auto;
+                                }
+                            </style>
+                            <div class="flex-container">
+                        """, unsafe_allow_html=True)
+                        
+                        # 获取FileManager实例
+                        file_manager = FileManager()
+                        full_frame_dir = file_manager.get_frame_dir(st.session_state['frames_dir'])
+                        
+                        # 遍历所有帧和gif
+                        for frame, gif_path in zip(reference_frames, gifs):
+                            # 构建完整的图片URL路径
+                            full_path = '/app/' + str(full_frame_dir).replace('\\', '/') + '/' + os.path.basename(gif_path)
+                            
+                            # 为每个图片创建一个包含标题的容器
+                            st.markdown(f"""
+                                <div class="flex-item">
+                                    <p>{frame['start']}s - {frame['end']}s</p>
+                                    <img src="{full_path}" alt="参考画面"/>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # 关闭flex容器
+                        st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.warning("视频源找不到")
 
@@ -175,15 +233,16 @@ def process_video(source, is_url):
         else:
             file_contents, mime_type, file_name = source
 
-            # # save video to temp path for later use
-            # file_manager = FileManager()
-            # paths = file_manager.save_video_file(file_contents, file_name)
-            # # 在session中只存储文件路径
-            # st.session_state['video_path'] = paths['relative_video_path']
-            # st.session_state['frames_dir'] = paths['relative_frames_dir']
+            # save video to temp path for later use
+            file_manager = FileManager()
+            paths = file_manager.save_video_file(file_contents, file_name)
 
-            # video_analysis = analyze_video_mock(source, is_url)
-            video_analysis = analyze_video(source, is_url)
+            # 在session中只存储文件路径
+            st.session_state['video_path'] = paths['relative_video_path']
+            st.session_state['frames_dir'] = paths['relative_frames_dir']
+
+            video_analysis = analyze_video_mock(source, is_url)
+            # video_analysis = analyze_video(source, is_url)
 
         st.session_state['video_analysis'] = video_analysis
     st.success('解读完成！')
@@ -215,8 +274,10 @@ def start_translate(script, target_language):
 
 
 # 返回第time_sec秒的画面image对象
-def get_video_frame(video_bytes, time_sec):
-    with av.open(BytesIO(video_bytes)) as container:
+def get_video_frame(time_sec):
+    file_manager = FileManager()
+    video_content = file_manager.get_video_content(st.session_state['video_path'])  # 临时加载到内存
+    with av.open(BytesIO(video_content)) as container:
         stream = container.streams.video[0]
         
         # 设置时间戳
@@ -236,8 +297,8 @@ def get_video_frame(video_bytes, time_sec):
 
 
 # 返回第time_sec秒的画面的base64字符串
-def get_video_frame_base64(video_bytes, time_sec):
-    frame = get_video_frame(video_bytes, time_sec)
+def get_video_frame_base64(time_sec):
+    frame = get_video_frame( time_sec)
     if frame:
         buffered = BytesIO()
         frame.save(buffered, format="PNG")
@@ -245,23 +306,30 @@ def get_video_frame_base64(video_bytes, time_sec):
     return None
 
 
-def display_video_frame(video_bytes, second):
+def display_video_frame(second):
      # 使用st.image方法
-    frame = get_video_frame(video_bytes, second)
+    frame = get_video_frame(second)
     if frame:
         st.image(frame, caption=f'第 {second} 秒的帧 ', width=300)  # 设置图片宽度为300像素
     else:
         st.error('无法提取指定时间的帧')
 
 
-def display_video_frame_base64(video_bytes, second):
-     # 使用 base64 方法在 markdown 中显示图片
-    frame_base64 = get_video_frame_base64(video_bytes, second)
-    if frame_base64:
-        st.markdown(f"## 第 {second} 秒的帧 (在 markdown 中使用 base64)")
-        st.markdown(f"![frame](data:image/png;base64,{frame_base64})")
-    else:
-        st.error('无法提取指定时间的帧 (base64 方法)')
+def display_video_clip(file_name):
+    # get full path
+    file_manager = FileManager()
+
+    # sample: videos\2024-11-05\4a44a241
+    full_frame_dir = file_manager.get_frame_dir(st.session_state['frames_dir'])
+
+    # full path for image src
+    # 将反斜杠替换为正斜杠
+    # static 目录被访问时需要加前缀app/
+    full_path = '/app/' + str(full_frame_dir).replace('\\', '/') + '/' + file_name
+    
+    st.markdown(f'<img src="{full_path}" alt="{full_path}" style="width:150px"/>', unsafe_allow_html=True)
+
+
 
 
 # 获取脚本中出现的参考画面
@@ -277,17 +345,17 @@ def get_img_clip(script):
     
     # 处理简单数字格式
     for start_time, end_time in matches1:
-        start_seconds = int(start_time)
-        end_seconds = int(end_time)
-        mid_time = (start_seconds + end_seconds) / 2
-        reference_frames.append(mid_time)
+        reference_frames.append({
+            'start': int(start_time),
+            'end': int(end_time)
+        })
     
     # 处理时:分格式
     for start_time, end_time in matches2:
-        start_seconds = convert_to_seconds(start_time)
-        end_seconds = convert_to_seconds(end_time)
-        mid_time = (start_seconds + end_seconds) / 2
-        reference_frames.append(mid_time)
+        reference_frames.append({
+            'start': convert_to_seconds(start_time),
+            'end': convert_to_seconds(end_time)
+        })
     
     return reference_frames
 
@@ -296,7 +364,45 @@ def convert_to_seconds(time_str):
     return minutes * 60 + seconds
 
 
-def enhance_script_with_img(script, video_bytes):
+def create_gif_for_script(script):
+    # 获取脚本中的所有参考画面时间段
+    reference_frames = get_img_clip(script)
+    
+    # 如果没有找到参考画面，直接返回
+    if not reference_frames:
+        return [], []
+    
+    file_manager = FileManager()
+    gif_paths = []
+    
+    # 获取视频内容
+    video_content = file_manager.get_video_content(st.session_state['video_path'])
+    full_frame_dir = file_manager.get_frame_dir(st.session_state['frames_dir'])
+    
+    # 为每个时间区间创建GIF
+    for frame in reference_frames:
+        try:
+            # 调用create_gif函数生成GIF
+            gif_path = create_gif(
+                video_bytes=video_content,
+                output_path=f"{full_frame_dir}/frame_{frame['start']}_{frame['end']}.gif",
+                start_time=frame['start'],
+                end_time=frame['end'],
+                fps=10,
+                target_width=320
+            )
+            
+            if gif_path:
+                gif_paths.append(gif_path)
+                
+        except Exception as e:
+            st.error(f"创建GIF时出错: {str(e)}")
+            continue
+    
+    return reference_frames, gif_paths
+
+
+def enhance_script_with_img(script):
     # 使用两个不同的模式来匹配两种格式
     pattern1 = r'<参考画面>(\d+)-(\d+)</参考画面>'
     pattern2 = r'<参考画面>(\d{2}:\d{2})-(\d{2}:\d{2})</参考画面>'
@@ -311,7 +417,7 @@ def enhance_script_with_img(script, video_bytes):
             end_seconds = int(end)
         
         mid_time = (start_seconds + end_seconds) / 2
-        frame_base64 = get_video_frame_base64(video_bytes, mid_time)
+        frame_base64 = get_video_frame_base64(mid_time)
         
         if frame_base64:
             return f'<img src="data:image/png;base64,{frame_base64}" style="width: 120px;" alt="第{mid_time}秒的帧">'
@@ -332,7 +438,7 @@ def analyze_video_mock(source, is_url):
     source_type = "URL" if is_url else "上传文件"
 
     file_contents, mime_type, file_name = source
-    display_video_frame(file_contents,  20)
+    # display_video_frame(20)
 
     st.info(st.session_state['video_path'])
     st.info(st.session_state['frames_dir'])
@@ -341,14 +447,15 @@ def analyze_video_mock(source, is_url):
 
     script_analysis_sample = read_from_resource('prompt/script-analysis-mock.md')
      
-    mock_analysis = f"""
-    这是一个示例视频解读结果（{source_type}）。
-    使用markdown语法显示图片
-    ![frame](data:image/png;base64,{get_video_frame_base64(file_contents, 10)})
+    # mock_analysis = f"""
+    # 这是一个示例视频解读结果（{source_type}）。
+    # 使用markdown语法显示图片
+    # ![frame](data:image/png;base64,{get_video_frame_base64(file_contents, 10)})
 
-    使用html显示图片
-    <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 50%; max-width: 300px;" alt="第10秒的帧">
-    """
+    # 使用html显示图片
+    # <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 50%; max-width: 300px;" alt="第10秒的帧">
+    # """
+
     return script_analysis_sample
 
 # mock method
@@ -379,7 +486,7 @@ def create_imitation_mock(analysis, input_data):
 | 1 | 黑白色调, 近景特写达人无奈的印象 | 2秒 | 你是否也苦恼居印问题呢? | 使用参考脚本00:01-00:03的画面特写, 达到处理成黑白画面. 突出居印问题 | 主题设定: 快速吸引目标受众, 引起共鸣 | 00:01-00:03 |
 | 2 | 黑白色调, 中景拍摄达人运倩画面, 神情失落 | 2秒 | 无法自信地面对他人 | 展现居印问题对生活的负面影响, 引发情感共鸣 | 问题呈现: 深化痛点, 为产品解决方案做铺垫 | <参考画面>1-3</参考画面> |
 | 3 | 彩色画面, 产品包装盒特写, 突出产品名称 | 2秒 | XXX好居产品, 你的居印放心! | 产品包装画面走大方, 使用动画文字突出产品名 | 产品介绍: 引入解决方案, 激发观众兴趣 | <参考画面>00:10-00:12</参考画面> |
-| 4 | 左侧为达人使用产品前的照片, 右侧为达人使用产品后的照片 | 3秒 | 使用前 VS 使用后效果看得见! | 使用前后效果对比, 突出使用产品前后居印的改变 | 效果展示: 直观展示产品效果, 增强说服�� | <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 100px;" alt="第10秒的帧"> |
+| 4 | 左侧为达人使用产品前的照片, 右侧为达人使用产品后的照片 | 3秒 | 使用前 VS 使用后效果看得见! | 使用前后效果对比, 突出使用产品前后居印的改变 | 效果展示: 直观展示产品效果, 增强说服 | <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 100px;" alt="第10秒的帧"> |
 
 <img src="data:image/png;base64,{get_video_frame_base64(file_contents, 10)}" style="width: 50%; max-width: 300px;" alt="第10秒的帧">
 
