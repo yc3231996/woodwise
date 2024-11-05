@@ -76,10 +76,11 @@ def main():
                 video_source = st.session_state['video_source']
                 if isinstance(video_source, str):  # URL
                     # URl模式中不支持显示参考图片
-                    st.markdown(st.session_state['imitated_script'], unsafe_allow_html=True)
+                    st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
                 else:  # Uploaded file
                     file_contents, _ = video_source
-                    enhanced_analysis = enhance_script_with_img(st.session_state['video_analysis'], file_contents)
+                    enhanced_analysis = st.session_state['video_analysis']
+                    # enhanced_analysis = enhance_script_with_img(st.session_state['video_analysis'], file_contents)
                     st.markdown(enhanced_analysis, unsafe_allow_html=True)
             else:
                 st.warning("视频源找不到")
@@ -324,6 +325,8 @@ def analyze_video_mock(source, is_url):
 
     file_contents, mime_type = source
     display_video_frame(file_contents,  20)
+
+    st.video(file_contents, start_time=10, end_time=15, )
 
     script_analysis_sample = read_from_resource('prompt/script-analysis-mock.md')
      
