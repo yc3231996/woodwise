@@ -1,3 +1,4 @@
 /__pycache__
 /config/gen-lang-client.json
 /.env
+/tmp

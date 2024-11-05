@@ -51,7 +51,7 @@ def analyze_video(source, is_url):
     video_file_url = f"https://storage.cloud.google.com/{source}"
     video_file = Part.from_uri(video_file_uri, mime_type="video/mp4")
   else:
-    file_contents, mime_type = source
+    file_contents, mime_type, file_name = source
     # base64_encoded = base64.b64encode(file_contents).decode('utf-8')
     video_file = Part.from_data(
       mime_type=mime_type,
@@ -190,7 +190,7 @@ def read_from_resource(file_path):
   return file_content
 
 if __name__ == "__main__":
-    prompt_test = f"hi"
+    prompt_test = f"tell me a long jok"
 
     model = GenerativeModel("gemini-1.5-flash")
     responses = model.generate_content(

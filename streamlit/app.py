@@ -7,6 +7,7 @@ from io import BytesIO
 from vertex_helper import analyze_video, create_imitation, translate_script, read_from_resource
 from vertexai.generative_models import Part
 import json
+from file_manager import FileManager
 
 # 添加密码保护
 def check_password():
@@ -63,7 +64,8 @@ def main():
         elif uploaded_file:
             file_contents = uploaded_file.read()
             mime_type = uploaded_file.type
-            process_video((file_contents, mime_type), is_url=False)
+            file_name = uploaded_file.name
+            process_video((file_contents, mime_type, file_name), is_url=False)
         else:
             st.warning("请提供视频 URL 或上传视频文件")
 
@@ -72,15 +74,13 @@ def main():
         st.markdown("## 视频解读结果")
         # 生成参考图片，会比较废时间
         with st.spinner('正在生成参考图片...'):
-            if 'video_source' in st.session_state:
-                video_source = st.session_state['video_source']
-                if isinstance(video_source, str):  # URL
+            if 'video_analysis' in st.session_state:
+                if video_url:  # URL
                     # URl模式中不支持显示参考图片
                     st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
                 else:  # Uploaded file
-                    file_contents, _ = video_source
-                    enhanced_analysis = st.session_state['video_analysis']
-                    # enhanced_analysis = enhance_script_with_img(st.session_state['video_analysis'], file_contents)
+                    video_analysis = st.session_state['video_analysis']
+                    enhanced_analysis = enhance_script_with_img(video_analysis, file_contents)
                     st.markdown(enhanced_analysis, unsafe_allow_html=True)
             else:
                 st.warning("视频源找不到")
@@ -126,23 +126,22 @@ def main():
         #         input_data_json = json.dumps(input_data)
         #         start_imitation(input_data_json)
 
-    # 显示模仿结果
-    if 'imitated_script' in st.session_state:
-        st.markdown("## 模仿复刻的脚本")
+    # # 显示模仿结果
+    # if 'imitated_script' in st.session_state:
+    #     st.markdown("## 模仿复刻的脚本")
 
-        # 由于要生成参考图片，会比较废时间
-        with st.spinner('正在生成参考图片...'):
-            if 'video_source' in st.session_state:
-                video_source = st.session_state['video_source']
-                if isinstance(video_source, str):  # URL
-                    # URl模式中不支持显示参考图片
-                    st.markdown(st.session_state['imitated_script'], unsafe_allow_html=True)
-                else:  # Uploaded file
-                    file_contents, _ = video_source
-                    enhanced_script = enhance_script_with_img(st.session_state['imitated_script'], file_contents)
-                    st.markdown(enhanced_script, unsafe_allow_html=True)
-            else:
-                st.warning("视频源找不到")
+    #     # 由于要生成参考图片，会比较废时间
+    #     with st.spinner('正在生成参考图片...'):
+    #         if 'video_source' in st.session_state:
+    #             video_source = st.session_state['video_source']
+    #             if video_url:  # URL
+    #                 # URl模式中不支持显示参考图片
+    #                 st.markdown(st.session_state['imitated_script'], unsafe_allow_html=True)
+    #             else:  # Uploaded file
+    #                 enhanced_script = enhance_script_with_img(st.session_state['imitated_script'], file_contents)
+    #                 st.markdown(enhanced_script, unsafe_allow_html=True)
+    #         else:
+    #             st.warning("视频源找不到")
 
         # # 显示翻译功能
         # st.header("翻译")
@@ -174,10 +173,19 @@ def process_video(source, is_url):
         if is_url:
             video_analysis = analyze_video(source, is_url)
         else:
-            # video_analysis = analyze_video_mock(source, is_url)
-            video_analysis = analyze_video(source, is_url)
+            file_contents, mime_type, file_name = source
+
+            # # save video to temp path for later use
+            # file_manager = FileManager()
+            # paths = file_manager.save_video_file(file_contents, file_name)
+            # # 在session中只存储文件路径
+            # st.session_state['video_path'] = paths['relative_video_path']
+            # st.session_state['frames_dir'] = paths['relative_frames_dir']
+
+            video_analysis = analyze_video_mock(source, is_url)
+            # video_analysis = analyze_video(source, is_url)
+
         st.session_state['video_analysis'] = video_analysis
-        st.session_state['video_source'] = source
     st.success('解读完成！')
 
 
@@ -323,10 +331,13 @@ def analyze_video_mock(source, is_url):
     time.sleep(1)  # 模拟耗时操作
     source_type = "URL" if is_url else "上传文件"
 
-    file_contents, mime_type = source
+    file_contents, mime_type, file_name = source
     display_video_frame(file_contents,  20)
 
-    st.video(file_contents, start_time=10, end_time=15, )
+    st.info(st.session_state['video_path'])
+    st.info(st.session_state['frames_dir'])
+
+    # st.video(file_contents, start_time=10, end_time=15, )
 
     script_analysis_sample = read_from_resource('prompt/script-analysis-mock.md')
      
@@ -354,7 +365,6 @@ def create_imitation_mock(analysis, input_data):
         with open(outline_km_path, 'r', encoding='gbk') as f:
             outline_km = f.read()
 
-    file_contents, mime_type = st.session_state['video_source']
 
     return f"""
     基于原视频的结构和您提供的信息，以下是一个模仿创作的脚本大纲：
