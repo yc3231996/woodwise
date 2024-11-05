@@ -182,8 +182,8 @@ def process_video(source, is_url):
             # st.session_state['video_path'] = paths['relative_video_path']
             # st.session_state['frames_dir'] = paths['relative_frames_dir']
 
-            video_analysis = analyze_video_mock(source, is_url)
-            # video_analysis = analyze_video(source, is_url)
+            # video_analysis = analyze_video_mock(source, is_url)
+            video_analysis = analyze_video(source, is_url)
 
         st.session_state['video_analysis'] = video_analysis
     st.success('解读完成！')
