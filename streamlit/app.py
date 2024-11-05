@@ -241,8 +241,8 @@ def process_video(source, is_url):
             st.session_state['video_path'] = paths['relative_video_path']
             st.session_state['frames_dir'] = paths['relative_frames_dir']
 
-            video_analysis = analyze_video_mock(source, is_url)
-            # video_analysis = analyze_video(source, is_url)
+            # video_analysis = analyze_video_mock(source, is_url)
+            video_analysis = analyze_video(source, is_url)
 
         st.session_state['video_analysis'] = video_analysis
     st.success('解读完成！')
@@ -326,7 +326,7 @@ def display_video_clip(file_name):
     # 将反斜杠替换为正斜杠
     # static 目录被访问时需要加前缀app/
     full_path = '/app/' + str(full_frame_dir).replace('\\', '/') + '/' + file_name
-    
+
     st.markdown(f'<img src="{full_path}" alt="{full_path}" style="width:150px"/>', unsafe_allow_html=True)
 
 
