@@ -73,75 +73,11 @@ def main():
 
     # 显示解读结果，每次state状态变化，也会触发执行流程，在下面代码中，不能引用button点击代码块中定义的变量，比如file_contents
     if 'video_analysis' in st.session_state:
-        video_analysis = st.session_state['video_analysis']
-        st.markdown("## 视频解读结果")
-        st.markdown(video_analysis, unsafe_allow_html=True)
 
-        # 生成参考图片，会比较废时间
-        with st.spinner('正在生成参考图片...'):
-            if 'video_analysis' in st.session_state:
-                if video_url:
-                    # TODO
-                    pass
-                else:
-                    # 获取参考时间和对应的gif路径
-                    reference_frames, gifs = create_gif_for_script(video_analysis)
-                    
-                    # 显示每个参考画面的时间区间和对应的gif
-                    if reference_frames and gifs:
-                        st.subheader("参考画面")
-                        
-                        # 添加自定义CSS来覆盖Streamlit默认样式
-                        st.markdown("""
-                            <style>
-                                .flex-container {
-                                    display: flex;
-                                    flex-wrap: wrap;
-                                    gap: 20px;
-                                    justify-content: flex-start;
-                                    width: 100%;
-                                }
-                                .flex-item {
-                                    flex: 0 1 150px;  /* 改为固定宽度，允许缩小但不放大 */
-                                    min-width: 150px; /* 确保最小宽度 */
-                                    text-align: center;
-                                    margin-bottom: 10px;
-                                }
-                                .flex-item p {
-                                    margin: 0 0 5px 0;
-                                    font-size: 0.9em;
-                                }
-                                .flex-item img {
-                                    width: 150px;
-                                    height: auto;
-                                    display: block;
-                                    margin: 0 auto;
-                                }
-                            </style>
-                            <div class="flex-container">
-                        """, unsafe_allow_html=True)
-                        
-                        # 获取FileManager实例
-                        file_manager = FileManager()
-                        full_frame_dir = file_manager.get_frame_dir(st.session_state['frames_dir'])
-                        
-                        # 遍历所有帧和gif
-                        for frame, gif_path in zip(reference_frames, gifs):
-                            # 构建完整的图片URL路径
-                            full_path = '/app/' + str(full_frame_dir).replace('\\', '/') + '/' + os.path.basename(gif_path)
-                            
-                            # 为每个图片创建一个包含标题的容器
-                            st.markdown(f"""
-                                <div class="flex-item">
-                                    <p>{frame['start']}s - {frame['end']}s</p>
-                                    <img src="{full_path}" alt="参考画面"/>
-                                </div>
-                            """, unsafe_allow_html=True)
-                        
-                        # 关闭flex容器
-                        st.markdown("</div>", unsafe_allow_html=True)
-            else:
-                st.warning("视频源找不到")
+        # video_analysis = st.session_state['video_analysis']
+        # with st.spinner('正在生成参考图片...'):
+        #     display_video_clip(video_analysis)
+        pass
 
 
         # # 显示模仿模块, 暂时disable
@@ -227,6 +163,11 @@ def main():
 
 
 def process_video(source, is_url):
+     # 创建一个空的容器用于显示流式输出
+    output_container = st.empty()
+    # 用于累积完整的响应
+    full_response = ""
+
     with st.spinner('正在解读视频...'):
         if is_url:
             video_analysis = analyze_video(source, is_url)
@@ -237,14 +178,25 @@ def process_video(source, is_url):
             file_manager = FileManager()
             paths = file_manager.save_video_file(file_contents, file_name)
 
-            # 在session中只存储文件路径
+            # 在session中只存储s视频文件路径
             st.session_state['video_path'] = paths['relative_video_path']
             st.session_state['frames_dir'] = paths['relative_frames_dir']
 
-            # video_analysis = analyze_video_mock(source, is_url)
-            video_analysis = analyze_video(source, is_url)
+            ## mock
+            # full_response = analyze_video_mock(source, is_url)
 
-        st.session_state['video_analysis'] = video_analysis
+            responses = analyze_video(source, is_url)
+            for response in responses:
+                chunk = response.text
+                full_response += chunk
+                output_container.markdown(full_response, unsafe_allow_html=True)
+
+            # when response is done, try to enhance result with images
+            with st.spinner('正在生成参考图片...'):
+                new_script = enhance_script_with_img(full_response)
+                output_container.markdown(new_script, unsafe_allow_html=True)
+
+        st.session_state['video_analysis'] = full_response
     st.success('解读完成！')
 
 
@@ -315,21 +267,21 @@ def display_video_frame(second):
         st.error('无法提取指定时间的帧')
 
 
-def display_video_clip(file_name):
-    # get full path
-    file_manager = FileManager()
+def display_video_clip(script):
+    reference_frames, gifs = create_gif_for_script(script)
+    if reference_frames and gifs:
+        st.subheader("参考画面")
 
-    # sample: videos\2024-11-05\4a44a241
-    full_frame_dir = file_manager.get_frame_dir(st.session_state['frames_dir'])
-
-    # full path for image src
-    # 将反斜杠替换为正斜杠
-    # static 目录被访问时需要加前缀app/
-    full_path = '/app/' + str(full_frame_dir).replace('\\', '/') + '/' + file_name
-
-    st.markdown(f'<img src="{full_path}" alt="{full_path}" style="width:150px"/>', unsafe_allow_html=True)
-
-
+        for frame, gif_path in zip(reference_frames, gifs):
+            full_path = '/app/' + gif_path
+            st.write(f"""
+                <div>
+                    <p>{frame['start']}s - {frame['end']}s</p>
+                    <img src="{full_path}" style="width: 150px" alt="参考画面"/>
+                </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.warning("视频源找不到")
 
 
 # 获取脚本中出现的参考画面
@@ -403,30 +355,39 @@ def create_gif_for_script(script):
 
 
 def enhance_script_with_img(script):
+    # 获取所有参考画面时间段和对应的GIF
+    reference_frames, gifs = create_gif_for_script(script)
+    
+    # 创建时间段到GIF路径的映射
+    time_to_gif = {}
+    for frame, gif_path in zip(reference_frames, gifs):
+        key = f"{frame['start']}-{frame['end']}"
+        time_to_gif[key] = '/app/' + gif_path
+
     # 使用两个不同的模式来匹配两种格式
     pattern1 = r'<参考画面>(\d+)-(\d+)</参考画面>'
     pattern2 = r'<参考画面>(\d{2}:\d{2})-(\d{2}:\d{2})</参考画面>'
     
-    def replace_with_image(match):
+    def replace_with_gif(match):
         start, end = match.groups()
         if ':' in start:
+            # 转换时:分格式为秒
             start_seconds = convert_to_seconds(start)
             end_seconds = convert_to_seconds(end)
         else:
             start_seconds = int(start)
             end_seconds = int(end)
         
-        mid_time = (start_seconds + end_seconds) / 2
-        frame_base64 = get_video_frame_base64(mid_time)
-        
-        if frame_base64:
-            return f'<img src="data:image/png;base64,{frame_base64}" style="width: 120px;" alt="第{mid_time}秒的帧">'
+        # 查找对应的GIF路径
+        key = f"{start_seconds}-{end_seconds}"
+        if key in time_to_gif:
+            return f'<img src="{time_to_gif[key]}" style="width: 200px;" alt="时间段 {start_seconds}s-{end_seconds}s 的GIF">'
         else:
-            return match.group(0)  # 如果无法获取图片,保留原始标记
+            return match.group(0)  # 如果找不到对应的GIF，保留原始标记
     
     # 替换两种格式的参考画面标记
-    new_script = re.sub(pattern1, replace_with_image, script)
-    new_script = re.sub(pattern2, replace_with_image, new_script)
+    new_script = re.sub(pattern1, replace_with_gif, script)
+    new_script = re.sub(pattern2, replace_with_gif, new_script)
     
     return new_script
 

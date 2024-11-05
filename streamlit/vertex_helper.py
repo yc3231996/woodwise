@@ -63,8 +63,8 @@ def analyze_video(source, is_url):
   contents = [video_file, prompt_read_video]
 
   model = GenerativeModel("gemini-1.5-flash-002")
-  response_transcript = model.generate_content(contents, generation_config=generation_config, safety_settings=safety_settings)
-  return response_transcript.text
+  responses  = model.generate_content(contents, generation_config=generation_config, safety_settings=safety_settings, stream=True)
+  return responses
 
 
 def create_imitation(sample_script, input_data):
@@ -192,14 +192,16 @@ def read_from_resource(file_path):
 if __name__ == "__main__":
     prompt_test = f"tell me a long jok"
 
-    model = GenerativeModel("gemini-1.5-flash")
+    initialize_vertexai()
+    
+    model = GenerativeModel("gemini-1.5-flash-002")
     responses = model.generate_content(
         [prompt_test],
         generation_config=generation_config,
         safety_settings=safety_settings,
         stream=True,
     )
-
+    
     for response in responses:
         print(response.text)
 
