@@ -83,12 +83,13 @@ def call_workflow_api(input_obj: Dict[str, Any], user_id: str = "dify-woodwise")
 if __name__ == "__main__":
     # 测试输入数据
     test_input = {
-        "script_sample": "hello, sample script",
-        "product_info": "product info is here"
+        "script_sample": "这是一个参考脚本哦",
+        "lang_info": "翻译成英文"
     }
     
     try:
         result = call_workflow_api(test_input)
-        print("API响应:", result['script_imitated'])
+        print(result)
+        # print("API响应:", result['script_imitated'])
     except Exception as e:
         print(f"发生错误: {e}")
