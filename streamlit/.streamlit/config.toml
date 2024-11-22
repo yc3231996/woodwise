@@ -30,7 +30,7 @@ toolbarMode = "minimal"
 [server]
 # Max size, in megabytes, for files uploaded with the file_uploader.
 # Default: 200
-maxUploadSize = 7
+maxUploadSize = 30
 enableStaticServing = true
 
 

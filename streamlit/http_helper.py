@@ -50,7 +50,7 @@ def call_workflow_api(input_obj: Dict[str, Any], user_id: str = "dify-woodwise")
             url=url,
             headers=headers,
             json=payload,
-            timeout=60  # 设置30秒超时
+            timeout=120
         )
         
         # 检查响应状态码

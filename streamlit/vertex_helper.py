@@ -2,8 +2,10 @@ from google.oauth2 import service_account
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part, SafetySetting
 import os
-import base64
 from http_helper import call_workflow_api
+import logging
+from datetime import datetime
+from google.cloud import storage
 
 # 全局配置
 generation_config = {
@@ -30,6 +32,11 @@ safety_settings = [
     ),
 ]
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 
 def initialize_vertexai():
   # cred = service_account.Credentials.from_service_account_file("config/gen-lang-client.json")
@@ -44,18 +51,17 @@ def initialize_vertexai():
 initialize_vertexai()
 
 
-# analysis video
-def analyze_video(source, is_url):
+# analysis video, if is_url is false,  source is file contents
+def analyze_video(source, is_url, mime_type="video/mp4"):
   if is_url:
+    ## TODO, check to see if source is a public url or GCS uri, assume all GCS uri for the moment
     video_file_uri = f"gs://{source}"
     video_file_url = f"https://storage.cloud.google.com/{source}"
-    video_file = Part.from_uri(video_file_uri, mime_type="video/mp4")
+    video_file = Part.from_uri(video_file_uri, mime_type)
   else:
-    file_contents, mime_type, file_name = source
-    # base64_encoded = base64.b64encode(file_contents).decode('utf-8')
     video_file = Part.from_data(
       mime_type=mime_type,
-      data=file_contents
+      data=source
     )
 
   prompt_read_video = read_from_resource('prompt/video_analysis_prompt.md')
@@ -72,7 +78,7 @@ def create_script(sample_script, input_data):
     "product_info": str(input_data)
   }
   result = call_workflow_api(input_obj)
-  return result['script_imitated']
+  return result['script_created']
 
 
 def translate_script(sample_script, input_data):
@@ -106,6 +112,48 @@ def read_from_resource(file_path):
     with open(file_path, 'r', encoding='gbk') as f:
       file_content = f.read()
   return file_content
+
+
+def upload_to_gcs(uploaded_file):
+    """
+    将Streamlit上传的文件保存到Google Cloud Storage
+    
+    Args:
+        uploaded_file: Streamlit的UploadedFile对象
+        
+    Returns:
+        str: 文件在GCS中的URI
+    """
+    bucket_name = os.getenv('GCS_BUCKET_NAME', 'shorts_analysis')
+    
+    try:
+        # 创建storage客户端
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        
+        # 生成唯一的blob名称
+        now = datetime.now()
+        date = now.strftime('%Y%m%d')
+        time = now.strftime('%H%M%S')
+        blob_name = f"videos/{date}/{time}_{uploaded_file.name}"
+        
+        # 创建新的blob并上传文件
+        blob = bucket.blob(blob_name)
+        
+        # 重置文件流到开头
+        uploaded_file.seek(0)
+        
+        blob.upload_from_file(uploaded_file, timeout=180)
+        
+        # 返回GCS URI: "gs://{bucket_name}/{blob_name}"
+        gcs_uri = f"{bucket_name}/{blob_name}"
+        return gcs_uri
+        
+    except Exception as e:
+        logging.error(f"上传文件到GCS时发生错误: {str(e)}")
+        raise e
+
+
 
 if __name__ == "__main__":
     prompt_test = f"tell me a long jok"

@@ -4,7 +4,7 @@ import re
 import base64
 import av
 from io import BytesIO
-from vertex_helper import analyze_video, create_script, translate_script, read_from_resource
+from vertex_helper import analyze_video, upload_to_gcs, create_script, translate_script, read_from_resource
 from vertexai.generative_models import Part
 import json
 from file_manager import FileManager
@@ -41,106 +41,168 @@ def check_password():
 
 def main():
     st.set_page_config(page_title="视频解读和创作", layout="wide")
+    st.title("视频解读和创作")
 
     # 如果密码不正确，不显示应用内容
     if not check_password():
         st.stop()
 
-    # # 添加侧边栏
-    # st.sidebar.markdown("## 产品知识库")
-    # st.session_state['selected_product'] = st.sidebar.selectbox("选择产品线", ["祛痘", "泥膜", "洗面奶", "隔离", "双管洁面"], disabled=True)
+    # 添加侧边栏
+    st.sidebar.title("上传视频")
+    upload_option = st.sidebar.radio("选择上传方式", options=["上传视频", "视频 URL"], horizontal=True, disabled=True)
 
-    st.title("视频解读和创作")
-    # 视频输入选项卡
-    tab1, tab2 = st.tabs(["上传视频", "视频 URL"])
-    with tab1:
-        uploaded_file = st.file_uploader("上传你的视频", type=["mp4", "mov", "avi"], help="支持的格式：MP4, MOV, AVI")
-    with tab2:
-        video_url = st.text_input("请提供视频链接", placeholder="https://...", disabled=True)
-        st.info("视频URL功能暂时不可用")
+    if upload_option == "上传视频":
+        uploaded_file = st.sidebar.file_uploader("上传你的视频", type=["mp4"], help="支持的格式: MP4", key="file_uploader_sidebar")
+    elif upload_option == "视频 URL":
+        video_url = st.sidebar.text_input("请提供视频链接 (暂不可用)", placeholder="https://...", disabled=True, key="text_input_video_url_sidebar")
 
-    # 解读按钮
-    if st.button("解读视频"):
-        if video_url:
-            process_video(video_url, is_url=True)
-        elif uploaded_file:
-            file_contents = uploaded_file.read()
-            mime_type = uploaded_file.type
-            file_name = uploaded_file.name
-            process_video((file_contents, mime_type, file_name), is_url=False)
-        else:
-            st.warning("请提供视频 URL 或上传视频文件")
+    st.sidebar.divider()
+    
+    st.sidebar.markdown("## 产品信息")
+    selected_product = st.sidebar.selectbox("选择产品线", ["祛痘产品", "清洁面膜", "洗面奶", "隔离霜", "美白面霜", "美白精华", "防晒霜", "舒缓修复凝胶", "补水面膜"], index=None)
 
-    lang_info = st.text_input(label="翻译指令", value="翻译成英文")
-    if st.button("翻译脚本"):
-        if 'video_analysis' in st.session_state:
-            start_translate(st.session_state['video_analysis'], lang_info)
-        else:
-            st.info("请先解读视频")
+    # 默认产品信息
+    product_info = load_product_info(selected_product) if selected_product else ""
+    # 允许用户输入自定义产品信息
+    user_input_info = st.sidebar.text_area("产品信息", product_info, height=300)
+    # 更新session状态，保存用户输入的产品信息
+    st.session_state['selected_product'] = selected_product
+    st.session_state['product_info'] = user_input_info
 
-    if st.button("显示翻译前的脚本"):
-        if 'video_analysis' in st.session_state:
-            st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
+    st.sidebar.divider()
 
-    if st.button("显示翻译后的脚本"):
-        if 'translated_script' in st.session_state:
-            st.markdown(st.session_state['translated_script'], unsafe_allow_html=True)
-        elif 'video_analysis' in st.session_state:
-            st.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
+    # 确定布局：按钮区，解读结果区，翻译区，创作区
+    tools_container = st.container()
+    analysis_container = st.empty()
+    # translate_container = st.container()
+    # creation_container = st.empty()
+
+    with tools_container:
+        btn1 = st.button("解读视频")
+        btn2 = st.button("创作新脚本")
+        if btn1:
+            if uploaded_file:
+                process_video(uploaded_file, is_url=False, output_container=analysis_container)
+            # elif video_url:
+            #     process_video(video_url, is_url=True)
+            else:
+                st.warning("请提供视频 URL 或上传视频文件")
+
+        if btn2:
+            # 检查selected_product和product_info在session中，且不为空
+            if st.session_state.get("selected_product") and st.session_state.get("product_info") :
+                start_creation(product_info)
+            else:
+                st.info("请选择产品线开始创作")
+    
+        with st.expander("翻译"):
+            lang_info = st.text_input(label="目标语言", value="翻译成英文")
+            translation_option = st.radio("选择翻译内容", options=["视频解读", "新创作的脚本"])
+            if st.button("开始翻译"):
+                if translation_option == "视频解读" and 'video_analysis' in st.session_state:
+                    start_translate(st.session_state['video_analysis'], lang_info)
+                elif translation_option == "新创作的脚本" and 'created_script' in st.session_state:
+                    start_translate(st.session_state['created_script'], lang_info)
+                else:
+                    st.warning("请先解读视频或创作新脚本")
 
 
-def process_video(source, is_url):
+    if 'video_analysis' in st.session_state:
+        analysis_container.markdown(st.session_state['video_analysis'], unsafe_allow_html=True)
+        # st.download_button(label="下载短视频解读", data=st.session_state['video_analysis'], file_name="video_analysis.md", mime="text/markdown")
+    
+    if 'created_script' in st.session_state:
+        st.markdown("-----")
+        st.markdown("# 创作结果：")
+        st.markdown(st.session_state['created_script'], unsafe_allow_html=True)
+        # st.download_button(label="下载新创作的脚本", data=st.session_state['created_script'], file_name="test.md", mime="text/markdown")    
+
+    if 'translated_script' in st.session_state:
+        st.markdown("-----")
+        st.markdown("# 翻译结果：")
+        st.markdown(st.session_state['translated_script'], unsafe_allow_html=True)
+        # st.download_button(label="下载翻译", data=st.session_state['translated_script'], file_name="translated_script.md", mime="text/markdown")
+
+    
+    if chat_input := st.chat_input():
+        st.chat_message("Assistant").write(chat_input)
+
+
+
+def process_video(source, is_url, output_container):
      # 创建一个空的容器用于显示流式输出
-    output_container = st.empty()
+    # output_container = st.empty()
+
     # 用于累积完整的响应
     full_response = ""
     new_full_script= ""
-
+    
     with st.spinner('正在解读视频...'):
-        file_contents, mime_type, file_name = source
+        ## TODO, only support file upload case for now
+        file_contents = source.read()
+        mime_type = source.type
+        file_name = source.name
 
         # save video to temp path for later use
         file_manager = FileManager()
         paths = file_manager.save_video_file(file_contents, file_name)
 
-        # 在session中只存储s视频文件路径
+        # 在session中只存储视频文件路径，不存储视频本身
         st.session_state['video_path'] = paths['relative_video_path']
         st.session_state['frames_dir'] = paths['relative_frames_dir']
 
-        ## mock
-        # new_full_script = analyze_video_mock(source, is_url)
-        # output_container.markdown(full_response, unsafe_allow_html=True)
-
-        responses = analyze_video(source, is_url)
-        for response in responses:
-            chunk = response.text
-            full_response += chunk
+        if DEBUG:
+            # mock
+            full_response = analyze_video_mock()
             output_container.markdown(full_response, unsafe_allow_html=True)
+        else:
+            if source.size > 1 * 1024 * 1024:
+                 # 对于大文件，上传到GCS
+                 file_gcs_uri = upload_to_gcs(source)
+                 responses = analyze_video(file_gcs_uri, True, mime_type)
+            else:
+                responses = analyze_video(file_contents, False, mime_type)
+
+            # streaming response
+            for response in responses:
+                chunk = response.text
+                full_response += chunk
+                output_container.markdown(full_response, unsafe_allow_html=True)
 
         # when response is done, try to enhance result with images
         with st.spinner('正在生成参考图片...'):
             new_full_script = enhance_script_with_img(full_response)
-            output_container.markdown(new_full_script, unsafe_allow_html=True)
 
+        # put result in session for later use
         st.session_state['video_analysis'] = new_full_script
 
     st.success('解读完成！')
 
 
-def start_creation(inspiration : str):
-    with st.spinner('正在创作中...'):
-        created_script = create_script_mock(st.session_state['imitated_script'], inspiration)
+def start_creation(product_info : str):
+    if 'video_analysis' not in st.session_state:
+        st.warning("请先创作新的视频脚本！")
+    else:
+        with st.spinner('正在创作中...'):
+            if DEBUG:
+                created_script = create_script_mock(st.session_state['video_analysis'], product_info)
+            else:
+                created_script = create_script(st.session_state['video_analysis'], product_info)
+
+        st.success('创作完成！')
         st.session_state['created_script'] = created_script
-    st.success('创作完成！')
+        return created_script
 
 
 def start_translate(script, lang_info):
     with st.spinner('正在翻译...'):
-        # translated_script = translate_script_mock(script, target_language)
-        translated_script = translate_script(script, lang_info)
+        if DEBUG:
+            translated_script = translate_script_mock(script, lang_info)
+        else:
+            translated_script = translate_script(script, lang_info)
+
     st.success('翻译完成！')
     st.session_state['translated_script'] = translated_script
-    st.markdown(translated_script, unsafe_allow_html=True)
     return translated_script
 
 
@@ -257,7 +319,7 @@ def create_gif_for_script(script):
 
 
 def enhance_script_with_img(script):
-    # 获取所有参考画面时间段和对应的GIF
+    # 生成GIF，获取参考画面时间段和对应的GIF
     reference_frames, gifs = create_gif_for_script(script)
     
     # 创建时间段到GIF路径的映射
@@ -311,13 +373,22 @@ def display_reference_gifs(script):
         st.warning("视频源找不到")
 
 
-# mock method
-def analyze_video_mock(source, is_url):
-    # 模拟解读过程
-    time.sleep(1)  # 模拟耗时操作
-    source_type = "URL" if is_url else "上传文件"
+# 缓存文件读取
+@st.cache_data
+def load_product_info(product_name):
+    try:
+        with open(f"prompt/{product_name}.md", "r", encoding="utf-8") as file:
+            return file.read()  # 读取文件内容并返回
+    except FileNotFoundError:
+        return ""  # 文件不存在时，返回空字符串
 
-    file_contents, mime_type, file_name = source
+
+# mock method
+def analyze_video_mock():
+    # 模拟解读过程
+    time.sleep(1) 
+
+    # file_contents, mime_type, file_name = source
     # display_video_frame(20)
 
     st.info(st.session_state['video_path'])
@@ -326,7 +397,8 @@ def analyze_video_mock(source, is_url):
 
     script_analysis_sample = read_from_resource('prompt/script-analysis-mock.md')
 
-    return script_analysis_sample
+    # return script_analysis_sample
+    return "this is a test result"
 
 # mock method
 def create_imitation_mock(analysis, input_data):
@@ -349,7 +421,7 @@ def create_imitation_mock(analysis, input_data):
 
 
 # create script mock
-def create_script_mock(imitated_script, inspiration):
+def create_script_mock(imitated_script, product_info):
     # 模拟创作过程
     time.sleep(2)  # 模拟耗时操作
     return "created script"
@@ -383,5 +455,6 @@ def translate_script_mock(script, target_language):
 
 
 if __name__ == "__main__":
+    DEBUG = False
     main()
 
