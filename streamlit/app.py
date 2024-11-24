@@ -48,6 +48,7 @@ def main():
         st.stop()
 
     # 添加侧边栏
+    # 视频上传区域
     st.sidebar.title("上传视频")
     upload_option = st.sidebar.radio("选择上传方式", options=["上传视频", "视频 URL"], horizontal=True, disabled=True)
 
@@ -56,8 +57,8 @@ def main():
     elif upload_option == "视频 URL":
         video_url = st.sidebar.text_input("请提供视频链接 (暂不可用)", placeholder="https://...", disabled=True, key="text_input_video_url_sidebar")
 
+    # 产品信息选择区
     st.sidebar.divider()
-    
     st.sidebar.markdown("## 产品信息")
     selected_product = st.sidebar.selectbox("选择产品线", ["祛痘产品", "清洁面膜", "洗面奶", "隔离霜", "美白面霜", "美白精华", "防晒霜", "舒缓修复凝胶", "补水面膜"], index=None)
 
@@ -69,13 +70,13 @@ def main():
     st.session_state['selected_product'] = selected_product
     st.session_state['product_info'] = user_input_info
 
+    # 翻译功能区
     st.sidebar.divider()
+    
 
-    # 确定布局：按钮区，解读结果区，翻译区，创作区
+    # 主布局区：解读结果区要用empty占位符，因为流式输出之后，需要用gif替换过的新结果覆盖原来的结果
     tools_container = st.container()
     analysis_container = st.empty()
-    # translate_container = st.container()
-    # creation_container = st.empty()
 
     with tools_container:
         btn1 = st.button("解读视频")
@@ -96,15 +97,18 @@ def main():
                 st.info("请选择产品线开始创作")
     
         with st.expander("翻译"):
-            lang_info = st.text_input(label="目标语言", value="翻译成英文")
-            translation_option = st.radio("选择翻译内容", options=["视频解读", "新创作的脚本"])
-            if st.button("开始翻译"):
-                if translation_option == "视频解读" and 'video_analysis' in st.session_state:
-                    start_translate(st.session_state['video_analysis'], lang_info)
-                elif translation_option == "新创作的脚本" and 'created_script' in st.session_state:
-                    start_translate(st.session_state['created_script'], lang_info)
-                else:
-                    st.warning("请先解读视频或创作新脚本")
+            with st.form(key='translation_form'):
+                lang_info = st.text_input(label="目标语言", value="翻译成英文")
+                translation_option = st.radio("选择翻译内容", options=["视频解读", "新创作的脚本"])
+                submit_button = st.form_submit_button("开始翻译")
+                
+                if submit_button:
+                    if translation_option == "视频解读" and 'video_analysis' in st.session_state:
+                        start_translate(st.session_state['video_analysis'], lang_info)
+                    elif translation_option == "新创作的脚本" and 'created_script' in st.session_state:
+                        start_translate(st.session_state['created_script'], lang_info)
+                    else:
+                        st.warning("请先解读视频或创作新脚本")
 
 
     if 'video_analysis' in st.session_state:
@@ -156,7 +160,7 @@ def process_video(source, is_url, output_container):
             full_response = analyze_video_mock()
             output_container.markdown(full_response, unsafe_allow_html=True)
         else:
-            if source.size > 1 * 1024 * 1024:
+            if source.size > 7 * 1024 * 1024:
                  # 对于大文件，上传到GCS
                  file_gcs_uri = upload_to_gcs(source)
                  responses = analyze_video(file_gcs_uri, True, mime_type)

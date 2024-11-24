@@ -143,7 +143,7 @@ def upload_to_gcs(uploaded_file):
         # 重置文件流到开头
         uploaded_file.seek(0)
         
-        blob.upload_from_file(uploaded_file, timeout=180)
+        blob.upload_from_file(uploaded_file, timeout=300)
         
         # 返回GCS URI: "gs://{bucket_name}/{blob_name}"
         gcs_uri = f"{bucket_name}/{blob_name}"
