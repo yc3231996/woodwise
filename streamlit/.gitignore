@@ -3,3 +3,4 @@
 /.env
 /tmp
 /static/videos
+/volumns/chat_records.db

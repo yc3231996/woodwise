@@ -24,8 +24,7 @@ class FileManager:
         """生成唯一的视频文件路径"""
         # 生成唯一文件名
         unique_id = str(uuid.uuid4())[:8]
-        extension = Path(original_filename).suffix
-        filename = f"{unique_id}{extension}"
+        filename = f"{unique_id}_{original_filename}"
         
         # 创建日期目录和帧目录
         date_dir = self.get_date_dir()

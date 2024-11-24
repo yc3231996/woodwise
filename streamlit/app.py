@@ -10,6 +10,7 @@ import json
 from file_manager import FileManager
 from media_helper import create_gif
 import os
+from sql_manager import SQLManager
 
 # 添加密码保护
 def check_password():
@@ -59,19 +60,27 @@ def main():
 
     # 产品信息选择区
     st.sidebar.divider()
-    st.sidebar.markdown("## 产品信息")
+    st.sidebar.markdown("## 产品信息：")
     selected_product = st.sidebar.selectbox("选择产品线", ["祛痘产品", "清洁面膜", "洗面奶", "隔离霜", "美白面霜", "美白精华", "防晒霜", "舒缓修复凝胶", "补水面膜"], index=None)
-
     # 默认产品信息
     product_info = load_product_info(selected_product) if selected_product else ""
     # 允许用户输入自定义产品信息
-    user_input_info = st.sidebar.text_area("产品信息", product_info, height=300)
+    user_input_info = st.sidebar.text_area("产品信息", product_info, height=250)
     # 更新session状态，保存用户输入的产品信息
     st.session_state['selected_product'] = selected_product
     st.session_state['product_info'] = user_input_info
 
     # 翻译功能区
     st.sidebar.divider()
+
+    # 历史记录区
+    st.sidebar.markdown("## 历史记录：")
+    current_user = "test" # TODO need to enhance to get from session
+    # history_container = st.sidebar.container()
+    # records = get_manager().get_threads_by_user(current_user) # TODO， 需要一个值返回video path的方法，否则全部的内容过大
+    # with history_container:
+    #     for record in records:
+    #         history_container.markdown(f"**Video Path:** {record['video_path']}", unsafe_allow_html=True)
     
 
     # 主布局区：解读结果区要用empty占位符，因为流式输出之后，需要用gif替换过的新结果覆盖原来的结果
@@ -127,7 +136,22 @@ def main():
         st.markdown(st.session_state['translated_script'], unsafe_allow_html=True)
         # st.download_button(label="下载翻译", data=st.session_state['translated_script'], file_name="translated_script.md", mime="text/markdown")
 
+    # save contents to database
+    if 'video_path' in st.session_state:
+        thread = {
+            "thread_id": st.session_state['video_path'],
+            "user": current_user,
+            "video_path": st.session_state.get('video_path', ''),
+            "video_info": st.session_state.get('video_info', ''),
+            "video_analysis": st.session_state.get('video_analysis', ''),
+            "created_script": st.session_state.get('created_script', ''),
+            "translated_script": st.session_state.get('translated_script', ''),
+            "others": ""
+        }
+        get_manager().upsert_thread(thread)
+
     
+    # chat area for experimental
     if chat_input := st.chat_input():
         st.chat_message("Assistant").write(chat_input)
 
@@ -160,7 +184,7 @@ def process_video(source, is_url, output_container):
             full_response = analyze_video_mock()
             output_container.markdown(full_response, unsafe_allow_html=True)
         else:
-            if source.size > 7 * 1024 * 1024:
+            if source.size > 5 * 1024 * 1024:
                  # 对于大文件，上传到GCS
                  file_gcs_uri = upload_to_gcs(source)
                  responses = analyze_video(file_gcs_uri, True, mime_type)
@@ -385,6 +409,11 @@ def load_product_info(product_name):
             return file.read()  # 读取文件内容并返回
     except FileNotFoundError:
         return ""  # 文件不存在时，返回空字符串
+
+
+@st.cache_resource
+def get_manager():
+    return SQLManager()
 
 
 # mock method
