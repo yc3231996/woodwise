@@ -43,7 +43,8 @@ def initialize_vertexai():
   # vertexai.init(project="gen-lang-client-0786739350", location="us-central1", credentials=cred)
 
   os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'config/gen-lang-client.json'
-  vertexai.init(project="gen-lang-client-0786739350", location="us-central1")
+  vertexai_location = os.getenv('VERTEXAI_LOCATION', 'asia-southeast1')
+  vertexai.init(project="gen-lang-client-0786739350", location=vertexai_location)
 
   return "Vertex AI initialized"
 
