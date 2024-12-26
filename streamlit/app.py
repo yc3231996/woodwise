@@ -184,7 +184,7 @@ def process_video(source, is_url, output_container):
             full_response = analyze_video_mock()
             output_container.markdown(full_response, unsafe_allow_html=True)
         else:
-            if source.size > 5 * 1024 * 1024:
+            if source.size > 1 * 1024 * 1024:
                  # 对于大文件，上传到GCS
                  file_gcs_uri = upload_to_gcs(source)
                  responses = analyze_video(file_gcs_uri, True, mime_type)

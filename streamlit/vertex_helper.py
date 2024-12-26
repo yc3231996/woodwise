@@ -68,7 +68,8 @@ def analyze_video(source, is_url, mime_type="video/mp4"):
   prompt_read_video = read_from_resource('prompt/video_analysis_prompt.md')
   contents = [video_file, prompt_read_video]
 
-  model = GenerativeModel("gemini-1.5-flash-002")
+  GEMINI_MODEL_NAME = os.getenv('GEMINI_MODEL_NAME', 'gemini-1.5-flash')
+  model = GenerativeModel(GEMINI_MODEL_NAME)
   responses  = model.generate_content(contents, generation_config=generation_config, safety_settings=safety_settings, stream=True)
   return responses
 
